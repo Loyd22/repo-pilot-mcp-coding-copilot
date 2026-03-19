@@ -6,20 +6,25 @@ type MessageListProps = {
 
 function MessageList({ messages }: MessageListProps) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "16px" }}>
+    <div className="message-list">
       {messages.map((message) => (
         <div
           key={message.id}
-          style={{
-            padding: "12px",
-            borderRadius: "10px",
-            backgroundColor: message.role === "user" ? "#dbeafe" : "#e5e7eb",
-            alignSelf: message.role === "user" ? "flex-end" : "flex-start",
-            maxWidth: "70%",
-          }}
+          className={`message-row ${message.role === "user" ? "user-row" : "assistant-row"}`}
         >
-          <strong>{message.role === "user" ? "You" : "Assistant"}:</strong>
-          <div>{message.content}</div>
+          <div className={`message-card ${message.role === "user" ? "user-card" : "assistant-card"}`}>
+            <div className="message-header">
+              <span className="message-role">
+                {message.role === "user" ? "You" : "Repo Pilot"}
+              </span>
+
+              {message.role === "assistant" && message.intent && (
+                <span className="message-intent">{message.intent}</span>
+              )}
+            </div>
+
+            <pre className="message-content">{message.content}</pre>
+          </div>
         </div>
       ))}
     </div>

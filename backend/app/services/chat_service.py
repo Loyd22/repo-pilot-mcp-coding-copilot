@@ -19,10 +19,14 @@ def handle_chat_message(db: Session, session_id: str, repo_path: str, message: s
             "session_id": session_id,
             "repo_path": repo_path,
             "message": message,
+            "tool_trace": [],
+            "files_viewed": [],
         }
     )
 
     return {
         "intent": result.get("intent", "unknown"),
         "answer": result.get("answer", "No answer generated."),
+        "tool_trace": result.get("tool_trace", []),
+        "files_viewed": result.get("files_viewed", []),
     }

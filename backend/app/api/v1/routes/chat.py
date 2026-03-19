@@ -36,6 +36,8 @@ def chat(payload: ChatRequest, db: Session = Depends(get_db)) -> ChatResponse:
             user_message=payload.message,
             intent=result["intent"],
             answer=result["answer"],
+            tool_trace=result["tool_trace"],
+            files_viewed=result["files_viewed"],
         )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

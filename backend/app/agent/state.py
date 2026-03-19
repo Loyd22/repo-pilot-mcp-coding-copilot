@@ -17,3 +17,5 @@ class RepoAgentState(TypedDict, total=False):
     intent: str
     tool_result: dict
     answer: str
+    tool_trace: list[str]
+    files_viewed: list[str]

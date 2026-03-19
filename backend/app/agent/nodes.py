@@ -2,10 +2,10 @@
 LangGraph nodes for repository assistant workflow.
 """
 
+from app.agent.state import RepoAgentState
 from app.services.git_service import get_git_diff
 from app.services.memory_service import get_session_messages
 from app.services.repo_service import get_repo_tree, read_repo_file, search_repo
-from app.agent.state import RepoAgentState
 
 
 def load_memory_node(state: RepoAgentState) -> RepoAgentState:
@@ -23,9 +23,13 @@ def load_memory_node(state: RepoAgentState) -> RepoAgentState:
         for message in messages
     ]
 
+    tool_trace = state.get("tool_trace", [])
+    tool_trace.append("load_memory")
+
     return {
         **state,
         "memory_messages": memory_messages,
+        "tool_trace": tool_trace,
     }
 
 
@@ -44,9 +48,13 @@ def classify_request_node(state: RepoAgentState) -> RepoAgentState:
     else:
         intent = "unknown"
 
+    tool_trace = state.get("tool_trace", [])
+    tool_trace.append(f"classify_request: {intent}")
+
     return {
         **state,
         "intent": intent,
+        "tool_trace": tool_trace,
     }
 
 
@@ -56,22 +64,41 @@ def run_tool_node(state: RepoAgentState) -> RepoAgentState:
     message = state["message"]
     intent = state["intent"]
 
+    files_viewed: list[str] = []
+    tool_trace = state.get("tool_trace", [])
+
     if intent == "repo_tree":
         result = get_repo_tree(repo_path)
+        files_viewed = result.get("tree", [])[:20]
+        tool_trace.append("run_tool: repo_tree")
     elif intent == "read_file":
         file_path = message[5:].strip()
         result = read_repo_file(repo_path, file_path)
+        files_viewed = [result.get("file_path", "")]
+        tool_trace.append("run_tool: read_file")
     elif intent == "search":
         query = message[5:].strip()
         result = search_repo(repo_path, query)
+        files_viewed = list(
+            {
+                match["file_path"]
+                for match in result.get("matches", [])[:20]
+            }
+        )
+        tool_trace.append("run_tool: search")
     elif intent == "git_diff":
         result = get_git_diff(repo_path)
+        files_viewed = result.get("changed_files", [])[:20]
+        tool_trace.append("run_tool: git_diff")
     else:
         result = {}
+        tool_trace.append("run_tool: unknown")
 
     return {
         **state,
         "tool_result": result,
+        "files_viewed": files_viewed,
+        "tool_trace": tool_trace,
     }
 
 
@@ -125,7 +152,11 @@ def generate_answer_node(state: RepoAgentState) -> RepoAgentState:
             "- What changed?"
         )
 
+    tool_trace = state.get("tool_trace", [])
+    tool_trace.append("generate_answer")
+
     return {
         **state,
         "answer": answer,
+        "tool_trace": tool_trace,
     }

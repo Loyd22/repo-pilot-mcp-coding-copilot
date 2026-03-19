@@ -23,3 +23,5 @@ class ChatResponse(BaseModel):
     user_message: str
     intent: str
     answer: str
+    tool_trace: list[str]
+    files_viewed: list[str]

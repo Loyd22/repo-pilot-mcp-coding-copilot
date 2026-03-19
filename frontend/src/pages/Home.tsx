@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { apiClient } from "../api/client";
 import ChatBox from "../components/ChatBox";
+import InfoPanel from "../components/InfoPanel";
 import MessageList from "../components/MessageList";
 import type { ChatApiResponse, ChatMessage } from "../types/chat";
 
 function Home() {
+  const [sessionId, setSessionId] = useState("session-001");
   const [repoPath, setRepoPath] = useState(
     "C:/Users/Loyd/Desktop/AA_AI_Engineer_Project/repo-pilot-mcp-coding-copilot"
   );
@@ -13,11 +15,16 @@ function Home() {
     {
       id: crypto.randomUUID(),
       role: "assistant",
-      content: "Repo Pilot is ready. Enter your repo path and ask a question.",
+      content:
+        "Repo Pilot is ready.\n\nTry:\n- Explain this repo\n- Read backend/app/main.py\n- Find FastAPI\n- What changed?",
     },
   ]);
 
   const [isLoading, setIsLoading] = useState(false);
+
+  const latestAssistantMessage = useMemo(() => {
+    return [...messages].reverse().find((message) => message.role === "assistant");
+  }, [messages]);
 
   const handleSendMessage = async (repoPathValue: string, message: string) => {
     const userMessage: ChatMessage = {
@@ -31,6 +38,7 @@ function Home() {
 
     try {
       const response = await apiClient.post<ChatApiResponse>("/api/v1/chat", {
+        session_id: sessionId,
         repo_path: repoPathValue,
         message,
       });
@@ -39,6 +47,9 @@ function Home() {
         id: crypto.randomUUID(),
         role: "assistant",
         content: response.data.answer,
+        intent: response.data.intent,
+        toolTrace: response.data.tool_trace,
+        filesViewed: response.data.files_viewed,
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
@@ -48,7 +59,10 @@ function Home() {
         role: "assistant",
         content:
           error?.response?.data?.detail ||
-          "Failed to connect to chat endpoint.",
+          "Failed to connect to the chat endpoint.",
+        intent: "error",
+        toolTrace: [],
+        filesViewed: [],
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
@@ -58,37 +72,65 @@ function Home() {
   };
 
   return (
-    <div
-      style={{
-        maxWidth: "900px",
-        margin: "0 auto",
-        padding: "40px 20px",
-        fontFamily: "Arial, sans-serif",
-      }}
-    >
-      <h1>Repo Pilot MCP Coding Copilot</h1>
-      <p>Personal AI repo assistant for daily development workflow.</p>
+    <div className="page-shell">
+      <div className="page-container">
+        <header className="hero-section">
+          <p className="hero-badge">MCP Coding Copilot</p>
+          <h1 className="hero-title">Repo Pilot</h1>
+          <p className="hero-subtitle">
+            A personal AI repo assistant for understanding codebases, searching files,
+            reading source code, and reviewing development changes.
+          </p>
+        </header>
 
-      <div
-        style={{
-          marginTop: "24px",
-          border: "1px solid #ddd",
-          borderRadius: "12px",
-          padding: "20px",
-          minHeight: "500px",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "space-between",
-          gap: "16px",
-        }}
-      >
-        <MessageList messages={messages} />
-        <ChatBox
-          onSendMessage={handleSendMessage}
-          isLoading={isLoading}
-          repoPath={repoPath}
-          setRepoPath={setRepoPath}
-        />
+        <section className="workspace-grid">
+          <div className="workspace-card main-workspace">
+            <div className="workspace-header">
+              <div>
+                <h2 className="workspace-title">Assistant Workspace</h2>
+                <p className="workspace-subtitle">
+                  Chat with your repository using the workflow you built.
+                </p>
+              </div>
+            </div>
+
+            <div className="session-row">
+              <div className="input-group">
+                <label className="input-label">Session ID</label>
+                <input
+                  type="text"
+                  value={sessionId}
+                  onChange={(e) => setSessionId(e.target.value)}
+                  className="text-input"
+                  placeholder="Enter session ID..."
+                />
+              </div>
+            </div>
+
+            <MessageList messages={messages} />
+
+            <ChatBox
+              onSendMessage={handleSendMessage}
+              isLoading={isLoading}
+              repoPath={repoPath}
+              setRepoPath={setRepoPath}
+            />
+          </div>
+
+          <div className="sidebar-panels">
+            <InfoPanel
+              title="Tool Trace"
+              items={latestAssistantMessage?.toolTrace ?? []}
+              emptyText="No tool trace available yet."
+            />
+
+            <InfoPanel
+              title="Files Viewed"
+              items={latestAssistantMessage?.filesViewed ?? []}
+              emptyText="No files viewed yet."
+            />
+          </div>
+        </section>
       </div>
     </div>
   );

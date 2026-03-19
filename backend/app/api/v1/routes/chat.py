@@ -21,7 +21,12 @@ def chat(payload: ChatRequest, db: Session = Depends(get_db)) -> ChatResponse:
 
         save_message(db, session.id, "user", payload.message)
 
-        result = handle_chat_message(payload.repo_path, payload.message)
+        result = handle_chat_message(
+        db=db,
+        session_id=payload.session_id,
+        repo_path=payload.repo_path,
+        message=payload.message,
+)
 
         save_message(db, session.id, "assistant", result["answer"])
 

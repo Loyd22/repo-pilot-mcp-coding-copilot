@@ -6,6 +6,7 @@ from app.agent.state import RepoAgentState
 from app.services.git_service import get_git_diff
 from app.services.memory_service import get_session_messages
 from app.services.repo_service import get_repo_tree, read_repo_file, search_repo
+from app.services.llm_service import generate_repo_answer
 
 
 def load_memory_node(state: RepoAgentState) -> RepoAgentState:
@@ -45,6 +46,14 @@ def classify_request_node(state: RepoAgentState) -> RepoAgentState:
         intent = "search"
     elif "what changed" in message or "git diff" in message or "show changes" in message:
         intent = "git_diff"
+    elif "what should i build next" in message or "what next" in message:
+        intent = "build_next"
+    elif "generate implementation prompt" in message or "codex prompt" in message or "cursor prompt" in message:
+        intent = "generate_prompt"
+    elif "explain this error" in message or "error" in message:
+        intent = "explain_error"
+    elif "production readiness" in message or "production-ready" in message or "is this production ready" in message:
+        intent = "production_review"
     else:
         intent = "unknown"
 
@@ -71,25 +80,60 @@ def run_tool_node(state: RepoAgentState) -> RepoAgentState:
         result = get_repo_tree(repo_path)
         files_viewed = result.get("tree", [])[:20]
         tool_trace.append("run_tool: repo_tree")
+
     elif intent == "read_file":
         file_path = message[5:].strip()
         result = read_repo_file(repo_path, file_path)
         files_viewed = [result.get("file_path", "")]
         tool_trace.append("run_tool: read_file")
+
     elif intent == "search":
         query = message[5:].strip()
         result = search_repo(repo_path, query)
-        files_viewed = list(
-            {
-                match["file_path"]
-                for match in result.get("matches", [])[:20]
-            }
-        )
+        files_viewed = list({match["file_path"] for match in result.get("matches", [])[:20]})
         tool_trace.append("run_tool: search")
+
     elif intent == "git_diff":
         result = get_git_diff(repo_path)
         files_viewed = result.get("changed_files", [])[:20]
         tool_trace.append("run_tool: git_diff")
+
+    elif intent == "build_next":
+        result = {
+            "repo_tree": get_repo_tree(repo_path),
+            "git_diff": get_git_diff(repo_path),
+        }
+        files_viewed = result["repo_tree"].get("tree", [])[:20]
+        tool_trace.append("run_tool: build_next")
+
+    elif intent == "generate_prompt":
+        result = {
+            "repo_tree": get_repo_tree(repo_path),
+            "git_diff": get_git_diff(repo_path),
+        }
+        files_viewed = result["repo_tree"].get("tree", [])[:20]
+        tool_trace.append("run_tool: generate_prompt")
+
+    elif intent == "production_review":
+        result = {
+            "repo_tree": get_repo_tree(repo_path),
+            "git_diff": get_git_diff(repo_path),
+            "config_hits": search_repo(repo_path, "config"),
+            "schema_hits": search_repo(repo_path, "schema"),
+            "test_hits": search_repo(repo_path, "test"),
+            "logging_hits": search_repo(repo_path, "logging"),
+        }
+        files_viewed = result["repo_tree"].get("tree", [])[:20]
+        tool_trace.append("run_tool: production_review")
+
+    elif intent == "explain_error":
+        result = {
+            "repo_tree": get_repo_tree(repo_path),
+            "note": "Use the user message as the main error context.",
+        }
+        files_viewed = result["repo_tree"].get("tree", [])[:20]
+        tool_trace.append("run_tool: explain_error")
+
     else:
         result = {}
         tool_trace.append("run_tool: unknown")
@@ -103,57 +147,17 @@ def run_tool_node(state: RepoAgentState) -> RepoAgentState:
 
 
 def generate_answer_node(state: RepoAgentState) -> RepoAgentState:
-    """Generate the final assistant answer from tool output."""
-    intent = state["intent"]
-    result = state.get("tool_result", {})
-
-    if intent == "repo_tree":
-        tree_preview = "\n".join(result.get("tree", [])[:30])
-        answer = (
-            f"Repository: {result.get('repo_name', 'Unknown')}\n\n"
-            f"Here are the first files and folders found:\n{tree_preview}"
-        )
-    elif intent == "read_file":
-        answer = (
-            f"File: {result.get('file_path', '')}\n\n"
-            f"Content:\n{result.get('content', '')[:4000]}"
-        )
-    elif intent == "search":
-        matches = result.get("matches", [])
-        query = result.get("query", "")
-
-        if not matches:
-            answer = f'No matches found for "{query}".'
-        else:
-            preview_lines = [
-                f'{match["file_path"]} (line {match["line_number"]}): {match["line_text"]}'
-                for match in matches[:20]
-            ]
-            answer = f'Search results for "{query}":\n\n' + "\n".join(preview_lines)
-    elif intent == "git_diff":
-        changed_files = result.get("changed_files", [])
-        diff_text = result.get("diff", "")[:4000]
-
-        if not changed_files:
-            answer = "There are no current uncommitted changes in this repository."
-        else:
-            answer = (
-                "Changed files:\n"
-                + "\n".join(changed_files)
-                + f"\n\nDiff preview:\n{diff_text}"
-            )
-    else:
-        answer = (
-            "I could not understand that request yet.\n\n"
-            "Try one of these:\n"
-            "- Explain this repo\n"
-            "- Read backend/app/main.py\n"
-            "- Find FastAPI\n"
-            "- What changed?"
-        )
+    """Generate the final assistant answer using the LLM."""
+    answer = generate_repo_answer(
+        user_message=state["message"],
+        intent=state["intent"],
+        repo_path=state["repo_path"],
+        memory_messages=state.get("memory_messages", []),
+        tool_result=state.get("tool_result", {}),
+    )
 
     tool_trace = state.get("tool_trace", [])
-    tool_trace.append("generate_answer")
+    tool_trace.append("generate_answer: llm")
 
     return {
         **state,

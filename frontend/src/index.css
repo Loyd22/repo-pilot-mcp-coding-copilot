@@ -414,7 +414,7 @@ code {
 @media (max-width: 768px) {
   .hero-title {
     font-size: 32px;
-  }
+  } 
 
   .workspace-card,
   .info-panel {

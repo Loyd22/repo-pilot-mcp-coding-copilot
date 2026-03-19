@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     APP_PORT: int = 8000
     FRONTEND_URL: str = "http://localhost:5173"
     DATABASE_URL: str = "sqlite:///./repopilot.db"
+    OPENAI_API_KEY: str = ""
+    OPENAI_MODEL: str = "gpt-5.4"
 
     model_config = SettingsConfigDict(
         env_file=".env",

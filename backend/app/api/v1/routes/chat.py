@@ -2,22 +2,32 @@
 Chat routes.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
 
+from app.db.session import get_db
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.services.chat_service import handle_chat_message
+from app.services.memory_service import get_or_create_session, save_message
 
 router = APIRouter(prefix="/api/v1", tags=["Chat"])
 
 
 @router.post("/chat", response_model=ChatResponse)
-def chat(payload: ChatRequest) -> ChatResponse:
-    """Handle a simple chat request for repository assistance."""
+def chat(payload: ChatRequest, db: Session = Depends(get_db)) -> ChatResponse:
+    """Handle a simple chat request for repository assistance with session memory."""
     try:
+        session = get_or_create_session(db, payload.session_id, payload.repo_path)
+
+        save_message(db, session.id, "user", payload.message)
+
         result = handle_chat_message(payload.repo_path, payload.message)
+
+        save_message(db, session.id, "assistant", result["answer"])
 
         return ChatResponse(
             success=True,
+            session_id=payload.session_id,
             user_message=payload.message,
             intent=result["intent"],
             answer=result["answer"],

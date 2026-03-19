@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     APP_HOST: str = "127.0.0.1"
     APP_PORT: int = 8000
     FRONTEND_URL: str = "http://localhost:5173"
+    DATABASE_URL: str = "sqlite:///./repopilot.db"
 
     model_config = SettingsConfigDict(
         env_file=".env",

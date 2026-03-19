@@ -2,19 +2,24 @@ import { useState } from "react";
 import { apiClient } from "../api/client";
 import ChatBox from "../components/ChatBox";
 import MessageList from "../components/MessageList";
-import type { ChatMessage } from "../types/chat";
+import type { ChatApiResponse, ChatMessage } from "../types/chat";
 
 function Home() {
+  const [repoPath, setRepoPath] = useState(
+    "C:/Users/Loyd/Desktop/AA_AI_Engineer_Project/repo-pilot-mcp-coding-copilot"
+  );
+
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: crypto.randomUUID(),
       role: "assistant",
-      content: "Repo Pilot frontend is ready.",
+      content: "Repo Pilot is ready. Enter your repo path and ask a question.",
     },
   ]);
+
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSendMessage = async (message: string) => {
+  const handleSendMessage = async (repoPathValue: string, message: string) => {
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: "user",
@@ -25,23 +30,28 @@ function Home() {
     setIsLoading(true);
 
     try {
-      const response = await apiClient.get("/");
+      const response = await apiClient.post<ChatApiResponse>("/api/v1/chat", {
+        repo_path: repoPathValue,
+        message,
+      });
 
       const assistantMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: "assistant",
-        content: response.data.message || "No response from backend.",
+        content: response.data.answer,
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
-    } catch (error) {
-      const errorMessage: ChatMessage = {
+    } catch (error: any) {
+      const assistantMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: "assistant",
-        content: "Failed to connect to backend.",
+        content:
+          error?.response?.data?.detail ||
+          "Failed to connect to chat endpoint.",
       };
 
-      setMessages((prev) => [...prev, errorMessage]);
+      setMessages((prev) => [...prev, assistantMessage]);
     } finally {
       setIsLoading(false);
     }
@@ -69,10 +79,16 @@ function Home() {
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
+          gap: "16px",
         }}
       >
         <MessageList messages={messages} />
-        <ChatBox onSendMessage={handleSendMessage} isLoading={isLoading} />
+        <ChatBox
+          onSendMessage={handleSendMessage}
+          isLoading={isLoading}
+          repoPath={repoPath}
+          setRepoPath={setRepoPath}
+        />
       </div>
     </div>
   );

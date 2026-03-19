@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.schemas.common import RootResponse
 from app.api.v1.routes.repo import router as repo_router
 from app.api.v1.routes.git import router as git_router
+from app.api.v1.routes.chat import router as chat_router
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -35,3 +36,4 @@ def root() -> RootResponse:
 app.include_router(health_router)
 app.include_router(repo_router)
 app.include_router(git_router)
+app.include_router(chat_router)

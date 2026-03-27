@@ -1,65 +1,61 @@
+// This component is the message input box at the bottom of the chat.
+//
+// Simple meaning:
+// - The user types a message here
+// - When the user clicks send, it calls the parent function
+// - This component does NOT manage the repo path input
+// - The repo path is already handled in Home.tsx
+
 import { useState } from "react";
 
+// These are the props this component needs from Home.tsx
 type ChatBoxProps = {
-  onSendMessage: (repoPath: string, message: string) => void;
-  isLoading: boolean;
+  // Current repository path, passed from the parent
   repoPath: string;
-  setRepoPath: (value: string) => void;
+
+  // Function to send the user's message to the backend
+  onSendMessage: (repoPathValue: string, message: string) => Promise<void>;
+
+  // True while waiting for backend response
+  isLoading: boolean;
 };
 
-function ChatBox({ onSendMessage, isLoading, repoPath, setRepoPath }: ChatBoxProps) {
-  const [input, setInput] = useState("");
+function ChatBox({ onSendMessage, isLoading, repoPath }: ChatBoxProps) {
+  // Local state for the text inside the message input box
+  const [message, setMessage] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  // This function runs when the user clicks Send
+  const handleSend = async () => {
+    // Stop if message is empty
+    if (!message.trim()) return;
 
-    if (!input.trim() || !repoPath.trim() || isLoading) return;
+    // Send the message to the parent component
+    await onSendMessage(repoPath, message);
 
-    onSendMessage(repoPath.trim(), input.trim());
-    setInput("");
+    // Clear the input after sending
+    setMessage("");
   };
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+    <div className="flex items-center gap-3">
+      {/* Message input box */}
       <input
-        type="text"
-        value={repoPath}
-        onChange={(e) => setRepoPath(e.target.value)}
-        placeholder="Enter repo path..."
-        style={{
-          padding: "12px",
-          borderRadius: "8px",
-          border: "1px solid #ccc",
-        }}
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+        placeholder="Ask something..."
+        className="flex-1 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-sm text-white"
+        disabled={isLoading}
       />
 
-      <div style={{ display: "flex", gap: "8px" }}>
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask something..."
-          style={{
-            flex: 1,
-            padding: "12px",
-            borderRadius: "8px",
-            border: "1px solid #ccc",
-          }}
-        />
-        <button
-          type="submit"
-          disabled={isLoading}
-          style={{
-            padding: "12px 16px",
-            borderRadius: "8px",
-            border: "none",
-            cursor: "pointer",
-          }}
-        >
-          {isLoading ? "Sending..." : "Send"}
-        </button>
-      </div>
-    </form>
+      {/* Send button */}
+      <button
+        onClick={handleSend}
+        disabled={isLoading || !message.trim()}
+        className="rounded-xl border border-zinc-700 bg-zinc-800 px-4 py-3 text-sm text-white hover:bg-zinc-700 disabled:opacity-50"
+      >
+        {isLoading ? "Sending..." : "Send"}
+      </button>
+    </div>
   );
 }
 
